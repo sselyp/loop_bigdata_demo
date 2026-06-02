@@ -71,9 +71,11 @@ public class DatasourceServiceImpl implements DatasourceService {
         if (db == null || !db.matches("^[a-zA-Z0-9_]+$")) {
             throw new IllegalArgumentException("Invalid database name: " + db);
         }
-        // Block private/reserved IP ranges to prevent SSRF
-        if (isPrivateAddress(host)) {
-            throw new IllegalArgumentException("Private IP addresses are not allowed: " + host);
+        // Block private/reserved IP ranges to prevent SSRF (allow override for dev/test)
+        String allowPrivate = System.getenv("ETL_ALLOW_PRIVATE_HOST");
+        if (!"true".equalsIgnoreCase(allowPrivate) && isPrivateAddress(host)) {
+            throw new IllegalArgumentException("Private IP addresses are not allowed: " + host
+                + ". Set ETL_ALLOW_PRIVATE_HOST=true to allow in dev/test environments.");
         }
 
         String url = buildJdbcUrl(datasource);
