@@ -1,6 +1,13 @@
 import axios from 'axios'
 import { message } from 'ant-design-vue'
 
+// 后端统一响应信封（响应拦截器已将其作为 resolve 值返回）
+export interface ApiResponse<T> {
+  code: number
+  message: string
+  data: T
+}
+
 const request = axios.create({
   baseURL: '/api',
   timeout: 30000
