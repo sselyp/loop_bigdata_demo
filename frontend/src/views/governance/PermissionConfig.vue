@@ -63,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { message, type FormInstance } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import {
@@ -140,9 +140,10 @@ async function load() {
   loading.value = true
   try {
     const res = await governanceApi.permissions()
-    permissions.value = (res as any).data
-  } catch {
+    permissions.value = res.data
+  } catch (e) {
     // 后端权限 API 尚未实现，回退到 mock 数据
+    console.warn('[governance] permission API unavailable, using mock', e)
     permissions.value = mockPermissions.map((p) => ({ ...p }))
   } finally {
     loading.value = false
@@ -179,8 +180,9 @@ async function save() {
     if (editingId.value) {
       try {
         await governanceApi.updatePermission(editingId.value, { ...form })
-      } catch {
+      } catch (e) {
         // 后端未就绪，本地更新用于演示
+        console.warn('[governance] updatePermission unavailable, applying locally', e)
       }
       const idx = permissions.value.findIndex((p) => p.id === editingId.value)
       if (idx >= 0) permissions.value[idx] = { ...permissions.value[idx], ...form, updatedAt: now }
@@ -188,8 +190,9 @@ async function save() {
     } else {
       try {
         await governanceApi.createPermission({ ...form })
-      } catch {
+      } catch (e) {
         // 后端未就绪，本地新增用于演示
+        console.warn('[governance] createPermission unavailable, applying locally', e)
       }
       const nextId = Math.max(0, ...permissions.value.map((p) => p.id)) + 1
       permissions.value.unshift({ id: nextId, ...form, actions: [...form.actions], updatedAt: now })
@@ -204,14 +207,15 @@ async function save() {
 async function remove(record: Permission) {
   try {
     await governanceApi.deletePermission(record.id)
-  } catch {
+  } catch (e) {
     // 后端未就绪，本地删除用于演示
+    console.warn('[governance] deletePermission unavailable, applying locally', e)
   }
   permissions.value = permissions.value.filter((p) => p.id !== record.id)
   message.success('已删除授权')
 }
 
-load()
+onMounted(load)
 </script>
 
 <style scoped>

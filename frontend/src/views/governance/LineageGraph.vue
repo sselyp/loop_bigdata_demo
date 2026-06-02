@@ -53,6 +53,7 @@ const emptyImage = Empty.PRESENTED_IMAGE_SIMPLE
 const loading = ref(false)
 const empty = ref(false)
 const selectedTable = ref(mockLineageTables[0])
+// TODO: 后端血缘/元数据 API 就绪后，改为异步拉取可选表列表，目前用 mock 表名
 const tableOptions = mockLineageTables.map((t) => ({ label: t, value: t }))
 const graphData = ref<LineageGraphData>({ nodes: [], edges: [] })
 const selectedNode = ref<LineageNode | null>(null)
@@ -142,9 +143,10 @@ async function load() {
   selectedNode.value = null
   try {
     const res = await governanceApi.lineage(selectedTable.value)
-    graphData.value = (res as any).data
-  } catch {
+    graphData.value = res.data
+  } catch (e) {
     // 后端血缘 API 尚未实现，回退到 mock 数据
+    console.warn('[governance] lineage API unavailable, using mock', e)
     graphData.value = mockLineage
   } finally {
     loading.value = false

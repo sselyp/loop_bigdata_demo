@@ -112,12 +112,13 @@ async function load() {
       governanceApi.qualityTrend(),
       governanceApi.qualityRules()
     ])
-    overview.value = (o as any).data
-    dimensions.value = (d as any).data
-    trend.value = (t as any).data
-    rules.value = (r as any).data
-  } catch {
+    overview.value = o.data
+    dimensions.value = d.data
+    trend.value = t.data
+    rules.value = r.data
+  } catch (e) {
     // 后端数据治理 API 尚未实现，回退到 mock 数据
+    console.warn('[governance] quality API unavailable, using mock', e)
     overview.value = { ...mockQualityOverview }
     dimensions.value = mockQualityDimensions
     trend.value = mockQualityTrend
