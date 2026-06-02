@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS gov_lineage (
     etl_task_id BIGINT COMMENT '关联ETL任务',
     lineage_type VARCHAR(30) DEFAULT 'ETL' COMMENT 'ETL/MANUAL/DERIVED',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_source (source_table_id),
     INDEX idx_target (target_table_id)
 ) COMMENT='数据血缘';
@@ -77,6 +78,7 @@ CREATE TABLE IF NOT EXISTS gov_quality_check (
     check_time DATETIME,
     duration_ms BIGINT,
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_rule (rule_id),
     INDEX idx_check_time (check_time)
 ) COMMENT='数据质量检查';

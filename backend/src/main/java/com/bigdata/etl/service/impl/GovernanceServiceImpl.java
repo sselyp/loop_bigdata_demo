@@ -1,5 +1,6 @@
 package com.bigdata.etl.service.impl;
 
+import com.bigdata.etl.common.CryptoUtils;
 import com.bigdata.etl.model.entity.*;
 import com.bigdata.etl.repository.*;
 import com.bigdata.etl.service.GovernanceService;
@@ -9,6 +10,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -47,7 +53,80 @@ public class GovernanceServiceImpl implements GovernanceService {
     @Transactional
     public void syncMetadata(Long datasourceId) {
         log.info("Syncing metadata for datasource id={}", datasourceId);
-        recordAudit("METADATA_SYNC", "DATASOURCE", datasourceId, "system", "Metadata sync triggered");
+        Datasource ds = datasourceMapper.selectById(datasourceId);
+        if (ds == null) {
+            throw new IllegalArgumentException("Datasource not found: " + datasourceId);
+        }
+
+        String password = ds.getPassword();
+        if (password != null && !password.isBlank()) {
+            try {
+                password = CryptoUtils.decrypt(password);
+            } catch (Exception e) {
+                log.error("Failed to decrypt datasource password id={}", datasourceId, e);
+                throw new IllegalStateException("Failed to decrypt datasource password");
+            }
+        }
+
+        String url = buildMetadataJdbcUrl(ds);
+        try (Connection conn = DriverManager.getConnection(url, ds.getUsername(), password)) {
+            // Sync tables
+            String tableSql = "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_COMMENT FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ?";
+            try (PreparedStatement ps = conn.prepareStatement(tableSql)) {
+                ps.setString(1, ds.getDatabase());
+                ResultSet rs = ps.executeQuery();
+                while (rs.next()) {
+                    GovMetadataTable table = new GovMetadataTable();
+                    table.setDatasourceId(datasourceId);
+                    table.setTableSchema(rs.getString("TABLE_SCHEMA"));
+                    table.setTableName(rs.getString("TABLE_NAME"));
+                    table.setTableComment(rs.getString("TABLE_COMMENT"));
+                    tableMapper.insert(table);
+
+                    // Sync columns for this table
+                    syncColumns(conn, ds.getDatabase(), table.getTableName(), table.getId());
+                }
+            }
+            log.info("Metadata sync complete for datasource id={}", datasourceId);
+        } catch (SQLException e) {
+            log.error("Failed to sync metadata for datasource id={}", datasourceId, e);
+            throw new RuntimeException("Metadata sync failed: " + e.getMessage());
+        }
+        recordAudit("METADATA_SYNC", "DATASOURCE", datasourceId, "system", "Metadata sync completed");
+    }
+
+    private void syncColumns(Connection conn, String schema, String tableName, Long tableId) throws SQLException {
+        String colSql = "SELECT COLUMN_NAME, ORDINAL_POSITION, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_COMMENT, COLUMN_KEY FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION";
+        try (PreparedStatement ps = conn.prepareStatement(colSql)) {
+            ps.setString(1, schema);
+            ps.setString(2, tableName);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                GovMetadataColumn col = new GovMetadataColumn();
+                col.setTableId(tableId);
+                col.setColumnName(rs.getString("COLUMN_NAME"));
+                col.setOrdinalPosition(rs.getInt("ORDINAL_POSITION"));
+                col.setDataType(rs.getString("DATA_TYPE"));
+                col.setIsNullable(rs.getString("IS_NULLABLE"));
+                col.setColumnDefault(rs.getString("COLUMN_DEFAULT"));
+                col.setColumnComment(rs.getString("COLUMN_COMMENT"));
+                String columnKey = rs.getString("COLUMN_KEY");
+                col.setIsPk("PRI".equals(columnKey) ? 1 : 0);
+                columnMapper.insert(col);
+            }
+        }
+    }
+
+    private String buildMetadataJdbcUrl(Datasource ds) {
+        String host = ds.getHost() != null ? ds.getHost().replaceAll("[^a-zA-Z0-9._-]", "") : "localhost";
+        String db = ds.getDatabase() != null ? ds.getDatabase().replaceAll("[^a-zA-Z0-9_]", "") : "";
+        return switch (ds.getType().toUpperCase()) {
+            case "MYSQL", "TIDB" ->
+                String.format("jdbc:mysql://%s:%d/%s?useSSL=false", host, ds.getPort(), db);
+            case "POSTGRESQL", "PG" ->
+                String.format("jdbc:postgresql://%s:%d/%s", host, ds.getPort(), db);
+            default -> throw new IllegalArgumentException("Metadata sync not supported for type: " + ds.getType());
+        };
     }
 
     @Override

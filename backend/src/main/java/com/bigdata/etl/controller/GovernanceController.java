@@ -137,7 +137,11 @@ public class GovernanceController {
 
     @Operation(summary = "测试脱敏效果")
     @PostMapping("/masking/rules/{id}/apply")
-    public Result<String> applyMasking(@PathVariable Long id, @RequestBody String value) {
+    public Result<String> applyMasking(@PathVariable Long id, @RequestBody java.util.Map<String, String> body) {
+        String value = body.getOrDefault("value", body.get("input"));
+        if (value == null || value.isBlank()) {
+            return Result.fail(400, "value is required");
+        }
         return Result.ok(governanceService.applyMasking(id, value));
     }
 

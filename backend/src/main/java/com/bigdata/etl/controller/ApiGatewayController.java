@@ -90,7 +90,11 @@ public class ApiGatewayController {
 
     @Operation(summary = "验证密钥")
     @PostMapping("/keys/validate")
-    public Result<Boolean> validateKey(@RequestBody String keyValue) {
+    public Result<Boolean> validateKey(@RequestBody java.util.Map<String, String> body) {
+        String keyValue = body.getOrDefault("keyValue", body.get("key"));
+        if (keyValue == null || keyValue.isBlank()) {
+            return Result.fail(400, "keyValue is required");
+        }
         return Result.ok(gatewayService.validateKey(keyValue));
     }
 
