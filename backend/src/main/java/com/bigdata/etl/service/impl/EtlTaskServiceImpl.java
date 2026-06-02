@@ -49,6 +49,16 @@ public class EtlTaskServiceImpl implements EtlTaskService {
         if (task.getSyncMode() == null || task.getSyncMode().isBlank()) {
             task.setSyncMode("FULL");
         }
+        if ("INCREMENTAL".equals(task.getSyncMode())) {
+            if (task.getIncrementalColumn() == null || task.getIncrementalColumn().isBlank()) {
+                throw new IllegalArgumentException(
+                    "Incremental sync mode requires incrementalColumn to be set");
+            }
+            if (!task.getIncrementalColumn().matches("^[a-zA-Z_][a-zA-Z0-9_]*$")) {
+                throw new IllegalArgumentException(
+                    "incrementalColumn must be a valid SQL column name");
+            }
+        }
         etlTaskMapper.insert(task);
         log.info("Created ETL task: id={}, name={}, syncMode={}", task.getId(), task.getName(), task.getSyncMode());
         return task;
@@ -167,7 +177,8 @@ public class EtlTaskServiceImpl implements EtlTaskService {
             String insertSql = buildUpsertSql(targetTable, columns, placeholders);
             tgtConn.setAutoCommit(false);
 
-            long rows = 0;
+            long rowsProcessed = 0;
+            long pendingCount = 0;
             int batchSize = 500;
             try (PreparedStatement pstmt = tgtConn.prepareStatement(insertSql)) {
                 while (rs.next()) {
@@ -175,21 +186,32 @@ public class EtlTaskServiceImpl implements EtlTaskService {
                         pstmt.setObject(i + 1, rs.getObject(i + 1));
                     }
                     pstmt.addBatch();
-                    rows++;
-                    if (rows % batchSize == 0) {
-                        pstmt.executeBatch();
+                    pendingCount++;
+                    if (pendingCount >= batchSize) {
+                        int[] results = pstmt.executeBatch();
+                        for (int r : results) {
+                            if (r > 0 || r == Statement.SUCCESS_NO_INFO) {
+                                rowsProcessed++;
+                            }
+                        }
                         tgtConn.commit();
-                        log.debug("Synced {} rows for task {}", rows, task.getId());
+                        pendingCount = 0;
+                        log.debug("Synced {} rows for task {}", rowsProcessed, task.getId());
                     }
                 }
                 // Final batch
-                if (rows % batchSize != 0) {
-                    pstmt.executeBatch();
+                if (pendingCount > 0) {
+                    int[] results = pstmt.executeBatch();
+                    for (int r : results) {
+                        if (r > 0 || r == Statement.SUCCESS_NO_INFO) {
+                            rowsProcessed++;
+                        }
+                    }
                     tgtConn.commit();
                 }
             }
-            log.info("Sync complete for task {}: {} rows written to {}", task.getId(), rows, targetTable);
-            return rows;
+            log.info("Sync complete for task {}: {} rows written to {}", task.getId(), rowsProcessed, targetTable);
+            return rowsProcessed;
         }
     }
 
