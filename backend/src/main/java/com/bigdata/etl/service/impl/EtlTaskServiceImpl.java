@@ -213,7 +213,7 @@ public class EtlTaskServiceImpl implements EtlTaskService {
                 && !"[]".equals(task.getFieldMapping().trim())) {
             String fieldMapping = task.getFieldMapping().trim();
             boolean first = true;
-            String regex = "[\[\]{}\"]";
+            String regex = "[\\[\\]{}\"]";
             for (String part : fieldMapping.replaceAll(regex, "").split(",")) {
                 if (part.startsWith("source:")) {
                     if (!first) sql.append(", ");

@@ -11,9 +11,11 @@ public class Datasource {
     @TableId(type = IdType.AUTO)
     private Long id;
     private String name;
+    @TableField("`type`")
     private String type;       // MYSQL, POSTGRESQL, ORACLE, SQLSERVER
     private String host;
     private Integer port;
+    @TableField("`database`")
     private String database;
     private String username;
     @JsonIgnore
