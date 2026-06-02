@@ -49,13 +49,13 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public Result<Void> handleDataAccess(DataAccessException e) {
         log.error("Database error", e);
-        return Result.fail(500, "Database operation error");
+        return Result.fail(500, "数据库操作异常，请稍后重试");
     }
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public Result<Void> handleGeneral(Exception e) {
         log.error("Unexpected error", e);
-        return Result.fail(500, "Internal server error: " + e.getMessage());
+        return Result.fail(500, "服务内部错误，请联系管理员");
     }
 }

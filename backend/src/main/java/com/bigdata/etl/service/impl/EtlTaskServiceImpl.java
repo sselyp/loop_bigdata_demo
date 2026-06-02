@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.sql.DataSource;
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -27,6 +28,7 @@ public class EtlTaskServiceImpl implements EtlTaskService {
     private final EtlTaskMapper etlTaskMapper;
     private final EtlExecutionMapper etlExecutionMapper;
     private final DatasourceMapper datasourceMapper;
+    private final DataSource appDataSource;
 
     @Override
     public List<EtlTask> listAll() {
@@ -142,26 +144,63 @@ public class EtlTaskServiceImpl implements EtlTaskService {
             // may not be encrypted yet
         }
 
+        String targetTable = task.getTargetTable() != null ? task.getTargetTable() : task.getSourceTable() + "_synced";
+
         try (Connection srcConn = DriverManager.getConnection(sourceUrl, sourceDs.getUsername(), password);
              Statement stmt = srcConn.createStatement();
-             ResultSet rs = stmt.executeQuery(selectSql)) {
+             ResultSet rs = stmt.executeQuery(selectSql);
+             Connection tgtConn = appDataSource.getConnection()) {
 
             ResultSetMetaData meta = rs.getMetaData();
             int columnCount = meta.getColumnCount();
             List<String> columns = new ArrayList<>();
+            List<String> placeholders = new ArrayList<>();
             for (int i = 1; i <= columnCount; i++) {
-                columns.add(meta.getColumnName(i));
+                String colName = meta.getColumnName(i);
+                columns.add(colName);
+                placeholders.add("?");
             }
 
+            String insertSql = buildUpsertSql(targetTable, columns, placeholders);
+            tgtConn.setAutoCommit(false);
+
             long rows = 0;
-            while (rs.next()) {
-                rows++;
-                if (rows % 1000 == 0) {
-                    log.debug("Synced {} rows for task {}", rows, task.getId());
+            int batchSize = 500;
+            try (PreparedStatement pstmt = tgtConn.prepareStatement(insertSql)) {
+                while (rs.next()) {
+                    for (int i = 0; i < columnCount; i++) {
+                        pstmt.setObject(i + 1, rs.getObject(i + 1));
+                    }
+                    pstmt.addBatch();
+                    rows++;
+                    if (rows % batchSize == 0) {
+                        pstmt.executeBatch();
+                        tgtConn.commit();
+                        log.debug("Synced {} rows for task {}", rows, task.getId());
+                    }
+                }
+                // Final batch
+                if (rows % batchSize != 0) {
+                    pstmt.executeBatch();
+                    tgtConn.commit();
                 }
             }
+            log.info("Sync complete for task {}: {} rows written to {}", task.getId(), rows, targetTable);
             return rows;
         }
+    }
+
+    private String buildUpsertSql(String table, List<String> columns, List<String> placeholders) {
+        // MySQL/TiDB INSERT ... ON DUPLICATE KEY UPDATE for idempotent writes
+        String cols = String.join(", ", columns);
+        String vals = String.join(", ", placeholders);
+        StringBuilder updates = new StringBuilder();
+        for (int i = 0; i < columns.size(); i++) {
+            if (i > 0) updates.append(", ");
+            updates.append(columns.get(i)).append(" = VALUES(").append(columns.get(i)).append(")");
+        }
+        return String.format("INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE %s",
+                table, cols, vals, updates.toString());
     }
 
     private String buildSelectSql(EtlTask task) {
@@ -209,18 +248,20 @@ public class EtlTaskServiceImpl implements EtlTaskService {
     }
 
     private String buildJdbcUrl(Datasource ds) {
+        String host = ds.getHost() != null ? ds.getHost().replaceAll("[^a-zA-Z0-9._-]", "") : "localhost";
+        String db = ds.getDatabase() != null ? ds.getDatabase().replaceAll("[^a-zA-Z0-9_]", "") : "";
         return switch (ds.getType().toUpperCase()) {
             case "MYSQL", "TIDB" ->
                 String.format("jdbc:mysql://%s:%d/%s?useSSL=false&connectTimeout=10000&socketTimeout=30000",
-                        ds.getHost(), ds.getPort(), ds.getDatabase());
+                        host, ds.getPort(), db);
             case "POSTGRESQL", "PG" ->
                 String.format("jdbc:postgresql://%s:%d/%s?connectTimeout=10&socketTimeout=30",
-                        ds.getHost(), ds.getPort(), ds.getDatabase());
+                        host, ds.getPort(), db);
             case "ORACLE" ->
-                String.format("jdbc:oracle:thin:@%s:%d:%s", ds.getHost(), ds.getPort(), ds.getDatabase());
+                String.format("jdbc:oracle:thin:@%s:%d:%s", host, ds.getPort(), db);
             case "SQLSERVER", "MSSQL" ->
                 String.format("jdbc:sqlserver://%s:%d;databaseName=%s;encrypt=false;loginTimeout=10",
-                        ds.getHost(), ds.getPort(), ds.getDatabase());
+                        host, ds.getPort(), db);
             default -> throw new IllegalArgumentException("Unsupported database type: " + ds.getType());
         };
     }

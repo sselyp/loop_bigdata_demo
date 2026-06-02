@@ -1,6 +1,7 @@
 package com.bigdata.etl.model.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -12,6 +13,7 @@ public class ApiKey {
 
     private String name;
     private String keyValue;
+    @JsonIgnore
     private String secretValue;
     private String roleName;
     private Integer rateLimitOverride;

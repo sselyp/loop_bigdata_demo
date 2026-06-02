@@ -7,6 +7,7 @@ import com.bigdata.etl.service.EtlTaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,7 +28,7 @@ public class EtlTaskController {
 
     @Operation(summary = "创建任务")
     @PostMapping
-    public Result<EtlTask> create(@RequestBody EtlTask task) {
+    public Result<EtlTask> create(@Valid @RequestBody EtlTask task) {
         return Result.ok(etlTaskService.create(task));
     }
 

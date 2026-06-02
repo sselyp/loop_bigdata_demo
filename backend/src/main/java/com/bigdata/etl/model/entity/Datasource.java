@@ -1,6 +1,7 @@
 package com.bigdata.etl.model.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -15,6 +16,7 @@ public class Datasource {
     private Integer port;
     private String database;
     private String username;
+    @JsonIgnore
     private String password;
     private String status;     // ACTIVE, INACTIVE
     private String remark;

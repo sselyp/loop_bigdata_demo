@@ -46,10 +46,14 @@ public class DatasourceController {
         return Result.ok();
     }
 
-    @Operation(summary = "测试连接")
-    @PostMapping("/test")
-    public Result<String> testConnection(@RequestBody Datasource datasource) {
-        boolean ok = datasourceService.testConnection(datasource);
+    @Operation(summary = "测试连接（使用已保存的数据源ID）")
+    @PostMapping("/{id}/test")
+    public Result<String> testConnection(@PathVariable Long id) {
+        Datasource ds = datasourceService.getById(id);
+        if (ds == null) {
+            return Result.fail(404, "数据源不存在");
+        }
+        boolean ok = datasourceService.testConnection(ds);
         return ok ? Result.ok("连接成功") : Result.fail("连接失败");
     }
 }
