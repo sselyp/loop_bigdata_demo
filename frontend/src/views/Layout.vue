@@ -18,6 +18,10 @@
           <sync-outlined />
           <span>ETL任务</span>
         </a-menu-item>
+        <a-menu-item key="gateway" @click="router.push('/gateway')">
+          <api-outlined />
+          <span>API管理</span>
+        </a-menu-item>
       </a-menu>
     </a-layout-sider>
     <a-layout>
@@ -37,7 +41,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { DashboardOutlined, DatabaseOutlined, SyncOutlined } from '@ant-design/icons-vue'
+import { DashboardOutlined, DatabaseOutlined, SyncOutlined, ApiOutlined } from '@ant-design/icons-vue'
 
 const collapsed = ref(false)
 const router = useRouter()

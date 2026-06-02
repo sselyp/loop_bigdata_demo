@@ -34,6 +34,12 @@ const router = createRouter({
           name: 'EtlTaskLogs',
           component: () => import('@/views/monitor/EtlTaskLogs.vue'),
           meta: { title: '执行日志' }
+        },
+        {
+          path: 'gateway',
+          name: 'ApiGateway',
+          component: () => import('@/views/gateway/ApiGateway.vue'),
+          meta: { title: 'API管理' }
         }
       ]
     }
