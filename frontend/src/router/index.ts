@@ -40,6 +40,24 @@ const router = createRouter({
           name: 'ApiGateway',
           component: () => import('@/views/gateway/ApiGateway.vue'),
           meta: { title: 'API管理' }
+        },
+        {
+          path: 'governance/quality',
+          name: 'GovernanceQuality',
+          component: () => import('@/views/governance/QualityDashboard.vue'),
+          meta: { title: '质量看板' }
+        },
+        {
+          path: 'governance/lineage',
+          name: 'GovernanceLineage',
+          component: () => import('@/views/governance/LineageGraph.vue'),
+          meta: { title: '数据血缘' }
+        },
+        {
+          path: 'governance/permission',
+          name: 'GovernancePermission',
+          component: () => import('@/views/governance/PermissionConfig.vue'),
+          meta: { title: '权限配置' }
         }
       ]
     }
