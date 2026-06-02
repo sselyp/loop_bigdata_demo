@@ -58,9 +58,15 @@ export const gatewayApi = {
 
   // API Keys
   listKeys: () => request.get('/gateway/keys'),
-  createKey: (data: ApiKey) => request.post('/gateway/keys', data),
-  revokeKey: (id: number) => request.post('/gateway/keys/' + id + '/revoke'),
-  validateKey: (keyValue: string) => request.post('/gateway/keys/validate', keyValue),
+  createKey: (data: ApiKey) =>
+    request.post('/gateway/keys', data, {
+      headers: { 'X-Admin-Key': (import.meta as any).env?.VITE_ADMIN_KEY || localStorage.getItem('adminKey') || '' }
+    }),
+  revokeKey: (id: number) =>
+    request.post('/gateway/keys/' + id + '/revoke', null, {
+      headers: { 'X-Admin-Key': (import.meta as any).env?.VITE_ADMIN_KEY || localStorage.getItem('adminKey') || '' }
+    }),
+  validateKey: (keyValue: string) => request.post('/gateway/keys/validate', { keyValue }),
 
   // Call Logs
   listCallLogs: (apiId?: number, limit?: number) =>
