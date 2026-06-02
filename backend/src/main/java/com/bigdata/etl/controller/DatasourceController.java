@@ -32,7 +32,7 @@ public class DatasourceController {
     }
 
     @Operation(summary = "更新数据源")
-    @PutMapping("/{id}")
+    @PutMapping("/{id:\d+}")
     public Result<Void> update(@PathVariable Long id, @RequestBody Datasource datasource) {
         datasource.setId(id);
         datasourceService.update(datasource);
@@ -40,14 +40,14 @@ public class DatasourceController {
     }
 
     @Operation(summary = "删除数据源")
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{id:\d+}")
     public Result<Void> delete(@PathVariable Long id) {
         datasourceService.delete(id);
         return Result.ok();
     }
 
     @Operation(summary = "测试连接（使用已保存的数据源ID）")
-    @PostMapping("/{id}/test")
+    @PostMapping("/{id:\d+}/test")
     public Result<String> testConnection(@PathVariable Long id) {
         Datasource ds = datasourceService.getById(id);
         if (ds == null) {
