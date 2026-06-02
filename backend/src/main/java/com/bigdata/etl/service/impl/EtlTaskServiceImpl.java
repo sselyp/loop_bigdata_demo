@@ -1,5 +1,6 @@
 package com.bigdata.etl.service.impl;
 
+import com.bigdata.etl.common.CryptoUtils;
 import com.bigdata.etl.model.entity.Datasource;
 import com.bigdata.etl.model.entity.EtlExecution;
 import com.bigdata.etl.model.entity.EtlTask;
@@ -75,6 +76,14 @@ public class EtlTaskServiceImpl implements EtlTaskService {
         if ("DISABLED".equals(task.getStatus())) {
             throw new IllegalStateException("Task is disabled: " + taskId);
         }
+        if ("INCREMENTAL".equals(task.getSyncMode())) {
+            if (task.getIncrementalColumn() == null || task.getIncrementalColumn().isBlank()) {
+                throw new IllegalArgumentException("Incremental mode requires incrementalColumn to be set");
+            }
+            if (task.getIncrementalColumn().matches(".*[;'—].*")) {
+                throw new IllegalArgumentException("incrementalColumn contains invalid characters");
+            }
+        }
 
         EtlExecution execution = new EtlExecution();
         execution.setTaskId(taskId);
@@ -126,8 +135,14 @@ public class EtlTaskServiceImpl implements EtlTaskService {
     private long doSync(EtlTask task, Datasource sourceDs) throws SQLException {
         String sourceUrl = buildJdbcUrl(sourceDs);
         String selectSql = buildSelectSql(task);
+        String password = sourceDs.getPassword();
+        try {
+            password = CryptoUtils.decrypt(password);
+        } catch (Exception ignored) {
+            // may not be encrypted yet
+        }
 
-        try (Connection srcConn = DriverManager.getConnection(sourceUrl, sourceDs.getUsername(), sourceDs.getPassword());
+        try (Connection srcConn = DriverManager.getConnection(sourceUrl, sourceDs.getUsername(), password);
              Statement stmt = srcConn.createStatement();
              ResultSet rs = stmt.executeQuery(selectSql)) {
 

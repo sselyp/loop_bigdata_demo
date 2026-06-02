@@ -1,5 +1,6 @@
 package com.bigdata.etl.service.impl;
 
+import com.bigdata.etl.common.CryptoUtils;
 import com.bigdata.etl.model.entity.Datasource;
 import com.bigdata.etl.repository.DatasourceMapper;
 import com.bigdata.etl.service.DatasourceService;
@@ -31,6 +32,9 @@ public class DatasourceServiceImpl implements DatasourceService {
         if (datasource.getStatus() == null || datasource.getStatus().isBlank()) {
             datasource.setStatus("ACTIVE");
         }
+        if (datasource.getPassword() != null && !datasource.getPassword().isBlank()) {
+            datasource.setPassword(CryptoUtils.encrypt(datasource.getPassword()));
+        }
         datasourceMapper.insert(datasource);
         log.info("Created datasource: id={}, name={}, type={}", datasource.getId(), datasource.getName(), datasource.getType());
         return datasource;
@@ -38,6 +42,9 @@ public class DatasourceServiceImpl implements DatasourceService {
 
     @Override
     public void update(Datasource datasource) {
+        if (datasource.getPassword() != null && !datasource.getPassword().isBlank()) {
+            datasource.setPassword(CryptoUtils.encrypt(datasource.getPassword()));
+        }
         datasourceMapper.updateById(datasource);
         log.info("Updated datasource: id={}", datasource.getId());
     }
@@ -51,7 +58,13 @@ public class DatasourceServiceImpl implements DatasourceService {
     @Override
     public boolean testConnection(Datasource datasource) {
         String url = buildJdbcUrl(datasource);
-        try (Connection conn = DriverManager.getConnection(url, datasource.getUsername(), datasource.getPassword())) {
+        String password = datasource.getPassword();
+        try {
+            password = CryptoUtils.decrypt(password);
+        } catch (Exception ignored) {
+            // password may not be encrypted yet (legacy data)
+        }
+        try (Connection conn = DriverManager.getConnection(url, datasource.getUsername(), password)) {
             boolean valid = conn.isValid(5);
             if (valid) {
                 log.info("Connection test success: {}@{}:{}", datasource.getType(), datasource.getHost(), datasource.getPort());
