@@ -89,7 +89,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import {
   ArrowLeftOutlined, ReloadOutlined, CaretRightOutlined,
@@ -98,7 +98,6 @@ import {
 import { etlTaskApi, type EtlTask, type EtlExecution } from '@/api/etlTask'
 
 const route = useRoute()
-const router = useRouter()
 const taskId = ref(Number(route.params.id))
 const taskInfo = ref<EtlTask | null>(null)
 const executions = ref<EtlExecution[]>([])
