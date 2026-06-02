@@ -6,6 +6,15 @@ const request = axios.create({
   timeout: 30000
 })
 
+// Inject X-API-Key header for backend authentication
+request.interceptors.request.use((config) => {
+  const apiKey = (import.meta as any).env?.VITE_API_KEY || localStorage.getItem('apiKey')
+  if (apiKey) {
+    config.headers['X-API-Key'] = apiKey
+  }
+  return config
+})
+
 request.interceptors.response.use(
   (response) => {
     const data = response.data

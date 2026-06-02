@@ -106,7 +106,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { SyncOutlined, CheckCircleOutlined, CloseCircleOutlined, HistoryOutlined } from '@ant-design/icons-vue'
-import { etlTaskApi, type EtlTask } from '@/api/etlTask'
+import { etlTaskApi, type EtlTask, type EtlExecution } from '@/api/etlTask'
 
 const router = useRouter()
 
@@ -119,7 +119,7 @@ const stats = reactive({
 
 const tasks = ref<EtlTask[]>([])
 const taskLoading = ref(false)
-const recentExecutions = ref<any[]>([])
+const recentExecutions = ref<EtlExecution[]>([])
 const execLoading = ref(false)
 
 const taskColumns = [
@@ -157,22 +157,15 @@ async function loadData() {
     stats.successCount = tasks.value.filter((t: EtlTask) => t.lastRunStatus === 'SUCCESS').length
     stats.failedCount = tasks.value.filter((t: EtlTask) => t.lastRunStatus === 'FAILED').length
 
-    // Collect recent executions from all tasks
-    const allExecs: any[] = []
-    for (const task of tasks.value) {
-      if (task.id) {
-        try {
-          const logs = await etlTaskApi.logs(task.id)
-          if (logs.data) {
-            for (const exec of logs.data) {
-              allExecs.push(exec)
-            }
-          }
-        } catch (e) {
-          // Task has no executions yet, skip
-        }
-      }
-    }
+    // Collect recent executions from all tasks in parallel
+    const logPromises = tasks.value
+      .filter(t => t.id)
+      .map(t => etlTaskApi.logs(t.id!)
+        .then(r => (r.data || []) as EtlExecution[])
+        .catch(() => [] as EtlExecution[])
+      )
+    const allLogs = await Promise.all(logPromises)
+    const allExecs: EtlExecution[] = allLogs.flat()
     allExecs.sort((a, b) => {
       const ta = a.startTime ? new Date(a.startTime).getTime() : 0
       const tb = b.startTime ? new Date(b.startTime).getTime() : 0

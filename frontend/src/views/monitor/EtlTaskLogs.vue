@@ -95,13 +95,13 @@ import {
   ArrowLeftOutlined, ReloadOutlined, CaretRightOutlined,
   CheckCircleOutlined, CloseCircleOutlined, SyncOutlined
 } from '@ant-design/icons-vue'
-import { etlTaskApi, type EtlTask } from '@/api/etlTask'
+import { etlTaskApi, type EtlTask, type EtlExecution } from '@/api/etlTask'
 
 const route = useRoute()
 const router = useRouter()
 const taskId = ref(Number(route.params.id))
 const taskInfo = ref<EtlTask | null>(null)
-const executions = ref<any[]>([])
+const executions = ref<EtlExecution[]>([])
 const loading = ref(false)
 const running = ref(false)
 
