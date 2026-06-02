@@ -149,12 +149,14 @@ public class EtlTaskServiceImpl implements EtlTaskService {
         String sourceUrl = buildJdbcUrl(sourceDs);
         String selectSql = buildSelectSql(task);
         String password = sourceDs.getPassword();
-        try {
-            password = CryptoUtils.decrypt(password);
-        } catch (Exception e) {
-            log.error("Failed to decrypt datasource password for id={}", sourceDs.getId(), e);
-            throw new IllegalStateException("Failed to decrypt datasource password. " +
-                "Ensure the datasource was stored with the current ETL_ENCRYPTION_KEY.");
+        if (password != null && !password.isBlank()) {
+            try {
+                password = CryptoUtils.decrypt(password);
+            } catch (Exception e) {
+                log.error("Failed to decrypt datasource password for id={}", sourceDs.getId(), e);
+                throw new IllegalStateException("Failed to decrypt datasource password. " +
+                    "Ensure the datasource was stored with the current ETL_ENCRYPTION_KEY.");
+            }
         }
 
         String targetTable = task.getTargetTable() != null ? task.getTargetTable() : task.getSourceTable() + "_synced";
