@@ -52,6 +52,13 @@ public class GlobalExceptionHandler {
         return Result.fail(500, "数据库操作异常，请稍后重试");
     }
 
+    @ExceptionHandler(org.springframework.web.servlet.NoHandlerFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public Result<Void> handleNotFound(org.springframework.web.servlet.NoHandlerFoundException e) {
+        log.debug("No handler found: {} {}", e.getHttpMethod(), e.getRequestURL());
+        return Result.fail(404, "接口不存在");
+    }
+
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public Result<Void> handleGeneral(Exception e) {
