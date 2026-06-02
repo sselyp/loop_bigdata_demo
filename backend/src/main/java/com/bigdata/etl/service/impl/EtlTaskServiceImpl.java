@@ -82,8 +82,9 @@ public class EtlTaskServiceImpl implements EtlTaskService {
             if (task.getIncrementalColumn() == null || task.getIncrementalColumn().isBlank()) {
                 throw new IllegalArgumentException("Incremental mode requires incrementalColumn to be set");
             }
-            if (task.getIncrementalColumn().matches(".*[;'—].*")) {
-                throw new IllegalArgumentException("incrementalColumn contains invalid characters");
+            if (!task.getIncrementalColumn().matches("^[a-zA-Z_][a-zA-Z0-9_]*$")) {
+                throw new IllegalArgumentException(
+                    "incrementalColumn must be a valid SQL column name: [a-zA-Z_][a-zA-Z0-9_]*");
             }
         }
 
@@ -140,8 +141,10 @@ public class EtlTaskServiceImpl implements EtlTaskService {
         String password = sourceDs.getPassword();
         try {
             password = CryptoUtils.decrypt(password);
-        } catch (Exception ignored) {
-            // may not be encrypted yet
+        } catch (Exception e) {
+            log.error("Failed to decrypt datasource password for id={}", sourceDs.getId(), e);
+            throw new IllegalStateException("Failed to decrypt datasource password. " +
+                "Ensure the datasource was stored with the current ETL_ENCRYPTION_KEY.");
         }
 
         String targetTable = task.getTargetTable() != null ? task.getTargetTable() : task.getSourceTable() + "_synced";

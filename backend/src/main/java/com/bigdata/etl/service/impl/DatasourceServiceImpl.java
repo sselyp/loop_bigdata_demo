@@ -80,8 +80,10 @@ public class DatasourceServiceImpl implements DatasourceService {
         String password = datasource.getPassword();
         try {
             password = CryptoUtils.decrypt(password);
-        } catch (Exception ignored) {
-            // password may not be encrypted yet (legacy data)
+        } catch (Exception e) {
+            log.error("Failed to decrypt password for datasource id={}", datasource.getId(), e);
+            throw new IllegalStateException("Failed to decrypt datasource password. " +
+                "Ensure the datasource was stored with the current ETL_ENCRYPTION_KEY.");
         }
         try (Connection conn = DriverManager.getConnection(url, datasource.getUsername(), password)) {
             boolean valid = conn.isValid(5);

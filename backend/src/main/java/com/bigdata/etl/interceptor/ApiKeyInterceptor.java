@@ -30,9 +30,26 @@ public class ApiKeyInterceptor implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         String path = request.getRequestURI();
 
-        // Skip auth for Swagger, health, and gateway management endpoints
+        // Skip auth for Swagger and health endpoints only
         if (path.startsWith("/swagger-ui") || path.startsWith("/v3/api-docs")
-                || path.startsWith("/health") || path.startsWith("/api/gateway/keys")) {
+                || path.startsWith("/health")) {
+            return true;
+        }
+
+        // /api/gateway/keys requires a special admin header for management operations
+        if (path.startsWith("/api/gateway/keys")) {
+            String adminKey = request.getHeader("X-Admin-Key");
+            String expectedAdminKey = System.getenv("ETL_ADMIN_KEY");
+            if (expectedAdminKey == null || expectedAdminKey.isBlank()) {
+                response.setStatus(503);
+                log.error("ETL_ADMIN_KEY not configured");
+                return false;
+            }
+            if (!expectedAdminKey.equals(adminKey)) {
+                response.setStatus(403);
+                log.warn("Invalid admin key for gateway key management");
+                return false;
+            }
             return true;
         }
 

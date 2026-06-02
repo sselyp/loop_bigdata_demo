@@ -26,10 +26,9 @@ public final class CryptoUtils {
     private static void initKey() {
         String keyB64 = System.getenv("ETL_ENCRYPTION_KEY");
         if (keyB64 == null || keyB64.isBlank()) {
-            // Fallback for dev: generate a random key (won't survive restart)
-            byte[] randomKey = new byte[32];
-            new SecureRandom().nextBytes(randomKey);
-            secretKey = new SecretKeySpec(randomKey, "AES");
+            throw new IllegalStateException(
+                "ETL_ENCRYPTION_KEY environment variable is required. " +
+                "Generate with: openssl rand -base64 32");
         } else {
             secretKey = new SecretKeySpec(Base64.getDecoder().decode(keyB64), "AES");
         }
