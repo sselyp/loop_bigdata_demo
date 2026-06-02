@@ -23,3 +23,17 @@ export const etlTaskApi = {
   run: (id: number) => request.post(`/etl/tasks/${id}/run`),
   logs: (id: number) => request.get(`/etl/tasks/${id}/logs`)
 }
+export interface EtlExecution {
+  id?: number
+  taskId: number
+  status: string
+  rowsProcessed: number
+  errorMessage?: string
+  startTime?: string
+  endTime?: string
+  createTime?: string
+}
+
+// Extend etlTaskApi with executions method
+etlTaskApi.executions = (id: number) => request.get(`/etl/tasks/${id}/logs`)
+etlTaskApi.listAll = () => request.get('/etl/tasks')
