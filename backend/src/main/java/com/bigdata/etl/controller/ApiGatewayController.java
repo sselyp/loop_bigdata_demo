@@ -90,8 +90,8 @@ public class ApiGatewayController {
 
     @Operation(summary = "验证密钥")
     @PostMapping("/keys/validate")
-    public Result<Boolean> validateKey(@RequestBody String keyValue) {
-        return Result.ok(gatewayService.validateKey(keyValue));
+    public Result<Boolean> validateKey(@RequestBody java.util.Map<String,String> body) {
+        return Result.ok(gatewayService.validateKey(body.getOrDefault("keyValue", body.getOrDefault("key", ""))));
     }
 
     // -- Call Logs --

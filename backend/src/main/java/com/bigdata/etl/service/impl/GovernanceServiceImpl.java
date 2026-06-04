@@ -11,6 +11,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import com.bigdata.etl.common.CryptoUtils;
+import com.bigdata.etl.model.entity.Datasource;
+import com.bigdata.etl.repository.DatasourceMapper;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.util.ArrayList;
+
 
 @Slf4j
 @Service
@@ -25,6 +34,7 @@ public class GovernanceServiceImpl implements GovernanceService {
     private final GovMaskingRuleMapper maskingRuleMapper;
     private final GovPermissionMapper permissionMapper;
     private final GovAuditLogMapper auditLogMapper;
+    private final DatasourceMapper datasourceMapper;
 
     // ========== Metadata ==========
 
@@ -47,7 +57,68 @@ public class GovernanceServiceImpl implements GovernanceService {
     @Transactional
     public void syncMetadata(Long datasourceId) {
         log.info("Syncing metadata for datasource id={}", datasourceId);
-        recordAudit("METADATA_SYNC", "DATASOURCE", datasourceId, "system", "Metadata sync triggered");
+        Datasource ds = datasourceMapper.selectById(datasourceId);
+        if (ds == null) throw new IllegalArgumentException("Datasource not found: " + datasourceId);
+        String password = ds.getPassword();
+        if (password != null && !password.isBlank()) {
+            try { password = CryptoUtils.decrypt(password); } catch (Exception e) { throw new IllegalStateException("Failed to decrypt password", e); }
+        }
+        String url = buildJdbcUrl(ds);
+        try (Connection conn = DriverManager.getConnection(url, ds.getUsername(), password)) {
+            String schemaName = ds.getDatabase();
+            // Fetch tables
+            String tablesSql = "SELECT TABLE_NAME, TABLE_COMMENT, TABLE_ROWS, DATA_LENGTH/1024/1024 AS size_mb " +
+                "FROM information_schema.TABLES WHERE TABLE_SCHEMA = '" + schemaName + "'  AND TABLE_TYPE = 'BASE TABLE'";
+            try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(tablesSql)) {
+                while (rs.next()) {
+                    String tableName = rs.getString("TABLE_NAME");
+                    // Upsert table record
+                    LambdaQueryWrapper<GovMetadataTable> tw = new LambdaQueryWrapper<>();
+                    tw.eq(GovMetadataTable::getDatasourceId, datasourceId).eq(GovMetadataTable::getTableName, tableName);
+                    GovMetadataTable tbl = tableMapper.selectOne(tw);
+                    if (tbl == null) { tbl = new GovMetadataTable(); tbl.setDatasourceId(datasourceId); tbl.setTableSchema(schemaName); tbl.setTableName(tableName); }
+                    tbl.setTableComment(rs.getString("TABLE_COMMENT"));
+                    tbl.setRowCountEstimate(rs.getLong("TABLE_ROWS"));
+                    long sizeMb = rs.getLong("size_mb"); tbl.setStorageMb(sizeMb);
+                    if (tbl.getId() == null) tableMapper.insert(tbl); else tableMapper.updateById(tbl);
+                    Long tableId = tbl.getId();
+                    // Fetch columns
+                    String colsSql = "SELECT COLUMN_NAME, ORDINAL_POSITION, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_COMMENT, COLUMN_KEY " +
+                        "FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = '"+ schemaName +"' AND TABLE_NAME = '"+ tableName +"' ORDER BY ORDINAL_POSITION";
+                    try (Statement cs = conn.createStatement(); ResultSet cr = cs.executeQuery(colsSql)) {
+                        while (cr.next()) {
+                            String colName = cr.getString("COLUMN_NAME");
+                            LambdaQueryWrapper<GovMetadataColumn> cw = new LambdaQueryWrapper<>();
+                            cw.eq(GovMetadataColumn::getTableId, tableId).eq(GovMetadataColumn::getColumnName, colName);
+                            GovMetadataColumn col = columnMapper.selectOne(cw);
+                            if (col == null) { col = new GovMetadataColumn(); col.setTableId(tableId); col.setColumnName(colName); }
+                            col.setOrdinalPosition(cr.getInt("ORDINAL_POSITION"));
+                            col.setDataType(cr.getString("DATA_TYPE"));
+                            col.setIsNullable(cr.getString("IS_NULLABLE"));
+                            col.setColumnDefault(cr.getString("COLUMN_DEFAULT"));
+                            col.setColumnComment(cr.getString("COLUMN_COMMENT"));
+                            col.setIsPk("PRI".equals(cr.getString("COLUMN_KEY")) ? 1 : 0);
+                            if (col.getId() == null) columnMapper.insert(col); else columnMapper.updateById(col);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("syncMetadata failed for datasource id={}", datasourceId, e);
+            throw new IllegalStateException("元数据同步失败: " + e.getMessage(), e);
+        }
+        recordAudit("METADATA_SYNC", "DATASOURCE", datasourceId, "system", "Metadata sync completed");
+        log.info("Metadata sync completed for datasource id={}", datasourceId);
+    }
+
+    private String buildJdbcUrl(Datasource ds) {
+        return switch (ds.getType().toUpperCase()) {
+            case "MYSQL", "TIDB" -> "jdbc:mysql://" + ds.getHost() + ":" + ds.getPort() + "/" + ds.getDatabase() + "?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true";
+            case "POSTGRESQL" -> "jdbc:postgresql://" + ds.getHost() + ":" + ds.getPort() + "/" + ds.getDatabase();
+            case "ORACLE" -> "jdbc:oracle:thin:@" + ds.getHost() + ":" + ds.getPort() + ":" + ds.getDatabase();
+            case "SQLSERVER" -> "jdbc:sqlserver://" + ds.getHost() + ":" + ds.getPort() + ";databaseName=" + ds.getDatabase();
+            default -> throw new IllegalArgumentException("Unsupported datasource type: " + ds.getType());
+        };
     }
 
     @Override

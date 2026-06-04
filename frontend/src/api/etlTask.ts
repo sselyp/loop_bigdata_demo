@@ -12,14 +12,27 @@ export interface EtlTask {
   scheduleType: string
   cronExpression?: string
   status?: string
+  lastRunStatus?: string
+  lastRunTime?: string
   remark?: string
+}
+
+export interface EtlExecution {
+  id?: number
+  taskId: number
+  status: string
+  rowsProcessed: number
+  errorMessage?: string
+  startTime?: string
+  endTime?: string
+  createTime?: string
 }
 
 export const etlTaskApi = {
   list: () => request.get('/etl/tasks'),
   create: (data: EtlTask) => request.post('/etl/tasks', data),
-  update: (id: number, data: EtlTask) => request.put(`/etl/tasks/${id}`, data),
-  delete: (id: number) => request.delete(`/etl/tasks/${id}`),
-  run: (id: number) => request.post(`/etl/tasks/${id}/run`),
-  logs: (id: number) => request.get(`/etl/tasks/${id}/logs`)
+  update: (id: number, data: EtlTask) => request.put('/etl/tasks/' + id, data),
+  delete: (id: number) => request.delete('/etl/tasks/' + id),
+  run: (id: number) => request.post('/etl/tasks/' + id + '/run'),
+  logs: (id: number) => request.get('/etl/tasks/' + id + '/logs'),
 }

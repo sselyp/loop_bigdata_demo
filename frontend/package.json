@@ -14,7 +14,9 @@
     "ant-design-vue": "^4.2.0",
     "@ant-design/icons-vue": "^7.0.0",
     "axios": "^1.7.0",
-    "dayjs": "^1.11.0"
+    "dayjs": "^1.11.0",
+    "echarts": "^5.5.0",
+    "@antv/g6": "^4.8.24"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.0",

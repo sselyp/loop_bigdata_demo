@@ -4,6 +4,11 @@ server:
 spring:
   application:
     name: etl-service
+  mvc:
+    throw-exception-if-no-handler-found: true
+  web:
+    resources:
+      add-mappings: false
   datasource:
     url: jdbc:mysql://localhost:4000/etl_platform?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
