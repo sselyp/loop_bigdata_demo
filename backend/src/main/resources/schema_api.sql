@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS api_call_log (
     response_time_ms BIGINT COMMENT '响应毫秒',
     error_message TEXT,
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_api_id (api_id),
     INDEX idx_create_time (create_time),
     INDEX idx_api_key (api_key_id)
